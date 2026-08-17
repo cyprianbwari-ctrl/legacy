@@ -1,0 +1,13 @@
+product,initial_handwritten,sat,sun,mon,tue,wed,thu,total_handwritten,balance_handwritten,review
+"Toilet Rolls (10 rolls / pack)","12 case + 4 rolls","","1 pack + 5 rolls","1 pack + 1?","1 pack","1 pack + 3 rolls","2 pc?","6? + 5 rolls","10 case + 7 rolls","Handwriting is partly ambiguous; verify before committing normalized quantities."
+"Ecofresh facial tissue box, 150 sheets, 1x30 pkt","37 case + 29 pkt","","4 pcs","8 pcs","12 pcs","6 pcs","4 pcs","34 pcs","36 case + ?","Verify handwritten balance/total."
+"Maxi Roll Magic 450 sheets (1x6)","30 rolls","","0","1 pc","0","0","0 pc","1 pc","29 pcs","Clear enough for initial and total."
+"Autocut Hand Towel Roll - 2Ply 230 Mtr","42 rolls","","0","1 pc","0","1 pc","0","2 pcs","40 rolls","Clear enough for initial and total."
+"Folded Tissue 200x15 3000 sheets 2ply","48 pcs","","7 pcs","9 pcs","1 pc","5 pcs","6 pcs","34 pcs","14 pcs","Clear enough for initial and total."
+"Clorox wipes","51 pcs","","0","2 pcs","0","0","1 pc","3 pcs","54 pcs","Paper arithmetic appears inconsistent; verify."
+"GLADE Air Freshener (300ml) Rose (WASHROOM)","8 pcs","","0","0","0","0","0","0","17 pcs","Paper arithmetic appears inconsistent; verify."
+"GLADE Air Freshener (300ml) Lavender (RECEPTION)","10 pcs","","0","1 pc","0","0","1 pc","2 pcs","34 pcs","Paper arithmetic appears inconsistent; verify."
+"Sanitary pads","1 pack + 15 pads","","3 pcs","0","2 pcs","4 pcs","4 pcs","19 pcs","44 pcs","Pack size is not specified; verify conversion."
+"Kimbo Beans Aroma Bio Organic 1KG","18 pcs","","1 kg","1 1/2 kg","1/2 kg","1/2 kg","0","2 1/2 kg","31 1/2 kg","Unit/initial appears inconsistent; verify."
+"RAINBOW Milk Organic Full Fat 1 LTR","98 pcs","","6 pcs","6 pcs","7 pcs","7 pcs","6 pcs","32 pcs","66 pcs","Clear usage but verify arithmetic."
+"Organic Brown Sugar SIS 500G","3 pcs + handwritten mark","","2 pcs","1 pc","1 pc","1/2","1/2","5 pcs","4 pcs","Handwritten mark and arithmetic need Admin verification."
