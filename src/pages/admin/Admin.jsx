@@ -21,7 +21,7 @@ export default function Admin(){
   </section>
   <section className="card quick-admin"><div className="card-head"><div><h2>Administration Controls</h2><p>Keep management actions in their dedicated areas.</p></div></div><div className="admin-links">
    <a href="/inventory/products"><Database size={18}/><div><strong>Products & Import</strong><span>Add, edit, deactivate and import products.</span></div></a>
-   <a href="/staff"><Users size={18}/><div><strong>Staff Accounts</strong><span>Add and deactivate staff accounts.</span></div></a>
+   <a href="/admin/staff"><Users size={18}/><div><strong>Staff Accounts</strong><span>Add, edit and delete staff access.</span></div></a>
    <a href="/admin/audit"><FileText size={18}/><div><strong>Audit Trail</strong><span>Review who changed what and when.</span></div></a>
   </div></section>
   <Modal open={open} title="Create Project" onClose={()=>setOpen(false)} footer={<><button className="btn btn-secondary" onClick={()=>setOpen(false)}>Cancel</button><ConfirmButton label="Confirm & Create" title="Create Project" message="The project will be created under the current company and this account will be added to it." onConfirm={create}/></>}><label className="form-stack">Project name<input value={name} onChange={e=>setName(e.target.value)} placeholder="Project name"/></label></Modal>

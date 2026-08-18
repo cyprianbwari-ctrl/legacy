@@ -1,33 +1,52 @@
-export const REPORTING_DAYS = ['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'];
+export const REPORTING_DAYS = [
+  'Saturday',
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday'
+];
 
-export function dateKey(date) {
-  return new Date(date).toISOString().slice(0,10);
+export function dateKey(value) {
+  const date = value instanceof Date ? value : parseLocalDate(String(value));
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function parseLocalDate(key) {
-  const [y,m,d] = key.split('-').map(Number);
-  return new Date(y, m-1, d);
+  if (key instanceof Date) return new Date(key);
+  const [year, month, day] = String(key).slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
 }
 
-export function addDays(date, amount) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + amount);
-  return d;
+export function normalizeDate(value) {
+  return value instanceof Date ? new Date(value) : parseLocalDate(value);
 }
 
-export function isFriday(date) {
-  return new Date(date).getDay() === 5;
+export function addDays(value, amount) {
+  const date = normalizeDate(value);
+  date.setDate(date.getDate() + amount);
+  return date;
 }
 
-// Reporting week is Saturday through Thursday. A Friday is a non-reporting day.
-// If the date is Friday, the surrounding week resolves to the preceding Saturday–Thursday.
-export function weekFor(dateLike = new Date()) {
-  const d = new Date(dateLike);
-  const day = d.getDay(); // Sun 0 ... Sat 6
+export function isFriday(value) {
+  return normalizeDate(value).getDay() === 5;
+}
+
+export function weekFor(value = new Date()) {
+  const date = normalizeDate(value);
+  const day = date.getDay(); // Sun 0 ... Sat 6
   const daysSinceSaturday = day === 6 ? 0 : day + 1;
-  const start = addDays(d, -daysSinceSaturday);
+  const start = addDays(date, -daysSinceSaturday);
   const end = addDays(start, 5);
-  return { start, end, key: `${dateKey(start)}_${dateKey(end)}` };
+
+  return {
+    start,
+    end,
+    key: `${dateKey(start)}_${dateKey(end)}`
+  };
 }
 
 export function shiftWeek(period, amount) {
@@ -35,35 +54,64 @@ export function shiftWeek(period, amount) {
 }
 
 export function monthWeeks(year, monthIndex) {
-  // Build four reporting weeks anchored to the first Saturday on/before the month
-  // start, then include only weeks whose Saturday–Thursday reporting window
-  // intersects the selected calendar month. If the calendar produces a fifth
-  // intersecting reporting week, it belongs to the next month for this UI.
-  const first = new Date(year, monthIndex, 1);
-  let cursor = weekFor(first).start;
-  const candidates = [];
-  for (let i=0; i<6; i++) {
-    const w = weekFor(cursor);
-    const intersects = w.end >= first && w.start <= new Date(year, monthIndex + 1, 0);
-    if (intersects) candidates.push(w);
+  // The application exposes exactly four operational weeks.
+  // A reporting week is always Saturday -> Thursday.
+  // A fifth overlapping week is carried into the following month's display.
+  const firstDay = new Date(year, monthIndex, 1, 12, 0, 0, 0);
+  const lastDay = new Date(year, monthIndex + 1, 0, 12, 0, 0, 0);
+
+  // First Saturday on or after the 1st of the calendar month.
+  const day = firstDay.getDay();
+  const daysUntilSaturday = day === 6 ? 0 : 6 - day;
+  const firstSaturday = addDays(firstDay, daysUntilSaturday);
+
+  const weeks = [];
+  let cursor = firstSaturday;
+
+  for (let i = 0; i < 4; i += 1) {
+    const period = weekFor(cursor);
+    weeks.push(period);
     cursor = addDays(cursor, 7);
   }
-  // Product reporting uses four weeks per month. Extra overlap is carried forward.
-  return candidates.slice(0,4);
+
+  // If the first Saturday is beyond the calendar month, use the preceding
+  // operational week so the month never becomes empty.
+  if (firstSaturday > lastDay) {
+    return [weekFor(addDays(firstDay, -(day === 6 ? 0 : day + 1)))];
+  }
+
+  return weeks;
 }
 
-export function monthLabel(dateLike) {
-  return new Intl.DateTimeFormat('en-US', {month:'long', year:'numeric'}).format(new Date(dateLike));
+export function monthLabel(value) {
+  const date = normalizeDate(value);
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric'
+  }).format(date);
 }
 
-export function dayLabel(dateLike) {
-  return new Intl.DateTimeFormat('en-US', {weekday:'short', month:'short', day:'numeric'}).format(new Date(dateLike));
+export function dayLabel(value) {
+  const date = normalizeDate(value);
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  }).format(date);
 }
 
-export function formatNumber(value, maximumFractionDigits=3) {
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(Number(value || 0));
+export function formatNumber(value, maximumFractionDigits = 3) {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits
+  }).format(Number(value || 0));
 }
 
 export function formatPeriod(period) {
-  return `${new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(period.start)} – ${new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(period.end)}`;
+  return `${new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric'
+  }).format(period.start)} – ${new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric'
+  }).format(period.end)}`;
 }

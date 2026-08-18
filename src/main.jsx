@@ -39,8 +39,8 @@ function Router(){
    <Route element={<App/>}>
     <Route index element={<Home/>}/>
     <Route path="usage/daily" element={<Daily/>}/>
-    <Route path="usage/weekly" element={<Weekly/>}/>
-    <Route path="usage/monthly" element={<Monthly/>}/>
+    <Route path="usage/weekly" element={<Protected manager><Weekly/></Protected>}/>
+    <Route path="usage/monthly" element={<Protected manager><Monthly/></Protected>}/>
     <Route path="usage/trends" element={<Protected manager><Trends/></Protected>}/>
     <Route path="inventory/products" element={<Protected manager><Products/></Protected>}/>
     <Route path="inventory/stock" element={<Protected manager><Stock/></Protected>}/>
@@ -48,6 +48,7 @@ function Router(){
     <Route path="staff/assignments" element={<Protected manager><Assignments/></Protected>}/>
     <Route path="admin" element={<Protected manager><Admin/></Protected>}/>
     <Route path="admin/audit" element={<Protected manager><Audit/></Protected>}/>
+    <Route path="admin/staff" element={<Protected manager><Staff/></Protected>}/>
     <Route path="admin/users" element={<Protected superOnly><Users/></Protected>}/>
     <Route path="*" element={<Navigate to="/" replace/>}/>
    </Route>

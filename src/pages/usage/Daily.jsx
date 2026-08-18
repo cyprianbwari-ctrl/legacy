@@ -5,7 +5,7 @@ import { useApp } from '../../AppContext';
 import PageHeader from '../../components/PageHeader';
 import StatusBadge from '../../components/StatusBadge';
 import ConfirmButton from '../../components/ConfirmButton';
-import { getProducts,getReport,submitDaily,updateDaily,getMySubmissionStatus } from '../../services/api';
+import { getProducts,getReport,submitDaily,updateDaily,getDailySubmissionStatus } from '../../services/api';
 import { unitLabel } from '../../lib/format';
 import { formatNumber } from '../../lib/periods';
 
@@ -27,9 +27,16 @@ export default function Daily(){
       const r=await getReport(project,date);setReport(r);
       setValues(Object.fromEntries((r?.daily_usage||[]).map(x=>[x.product_id,x.quantity])));
     } else {
-      const status=await getMySubmissionStatus(project,date);
-      setReport(status.submitted ? {submitted_at:status.submitted_at} : null);
-      setValues(Object.fromEntries(p.map(x=>[x.id,0])));
+      const status = await getDailySubmissionStatus(project, date);
+      setReport(
+        status.day_submitted
+          ? {
+              submitted_at: status.my_submitted_at,
+              submitted_by_me: status.submitted_by_me
+            }
+          : null
+      );
+      setValues(Object.fromEntries(p.map(x => [x.id, 0])));
     }
   }
   useEffect(()=>{load().catch(e=>setError(e.message))},[project?.id,date]);
@@ -55,7 +62,7 @@ export default function Daily(){
     {isFriday && <div className="notice warning"><Lock size={17}/><div><strong>Friday is an off day.</strong><span>No consumption report is accepted or displayed for Friday.</span></div></div>}
     {!isFriday && <section className="card">
       <div className="report-toolbar"><div><span className="eyebrow">REPORT DATE</span><h2>{new Date(`${date}T12:00:00`).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</h2></div>{submitted?<StatusBadge status="submitted">Submitted</StatusBadge>:<StatusBadge status="pending">Not submitted</StatusBadge>}</div>
-      {submitted && !manager ? <div className="locked-report"><CheckCircle2 size={24}/><h3>Report submitted</h3><p>This report is locked. Staff cannot view or edit a submitted report.</p><small>Submitted by {report.profiles?.full_name||'staff'}.</small></div> :
+      {submitted && !manager ? <div className="locked-report"><CheckCircle2 size={24}/><h3>Report already submitted</h3><p>This reporting day is locked. Staff cannot view or edit submitted quantities.</p><small>{report.submitted_by_me ? 'You submitted this report.' : 'Another staff member has already submitted this day.'}</small></div> :
       <form onSubmit={e=>{e.preventDefault();if(!submitted)submit().catch(e=>setError(e.message))}}>
         <div className="table-wrap">
           <table className="data-table consumption-table"><thead><tr><th>Housekeeping Supplies</th><th>Unit</th><th>Today's Usage</th></tr></thead>

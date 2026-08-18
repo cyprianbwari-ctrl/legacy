@@ -44,8 +44,8 @@ export default function AppLayout() {
           </button>
           {usageOpen && <div className="nav-sub">
             <NavLink to="/usage/daily" onClick={closeMobile}>Daily</NavLink>
-            <NavLink to="/usage/weekly" onClick={closeMobile}>Weekly</NavLink>
-            <NavLink to="/usage/monthly" onClick={closeMobile}>Monthly</NavLink>
+            {manager && <NavLink to="/usage/weekly" onClick={closeMobile}>Weekly</NavLink>}
+            {manager && <NavLink to="/usage/monthly" onClick={closeMobile}>Monthly</NavLink>}
             {manager && <NavLink to="/usage/trends" onClick={closeMobile}>Trends</NavLink>}
           </div>}
         </div>

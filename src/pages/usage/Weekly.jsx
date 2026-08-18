@@ -166,11 +166,11 @@ export default function Weekly() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={13} className="loading-row">Loading…</td>
+                  <td colSpan={12} className="loading-row">Loading…</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="loading-row">No products found.</td>
+                  <td colSpan={12} className="loading-row">No products found.</td>
                 </tr>
               ) : (
                 rows.map((row) => {

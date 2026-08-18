@@ -1,4 +1,5 @@
-project_id = "replace-with-your-project-ref"
-
 [functions.create-user]
+verify_jwt = true
+
+[functions.admin-user]
 verify_jwt = true
