@@ -109,9 +109,11 @@ export default function Home() {
           <div>
             <div className="eyebrow">TODAY'S REPORT</div>
             <h2>
-              {staffStatus.submitted
-                ? 'Report submitted'
-                : 'Daily report awaiting submission'}
+              {loading
+                ? 'Checking today’s report…'
+                : staffStatus.submitted
+                  ? 'Report submitted'
+                  : 'Daily report awaiting submission'}
             </h2>
             <p>
               {staffStatus.submitted
@@ -120,13 +122,13 @@ export default function Home() {
             </p>
           </div>
 
-          {!staffStatus.submitted && (
+          {!loading && !staffStatus.submitted && (
             <a className="btn btn-primary btn-lg" href="/usage/daily">
               Start Daily Report <ArrowRight size={17} />
             </a>
           )}
 
-          {staffStatus.submitted && (
+          {!loading && staffStatus.submitted && (
             <StatusBadge status="submitted">SUBMITTED</StatusBadge>
           )}
         </section>

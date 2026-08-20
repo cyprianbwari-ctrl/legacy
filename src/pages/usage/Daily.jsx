@@ -1,77 +1,9 @@
-import React from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Lock, Send } from 'lucide-react';
-import { useApp } from '../../AppContext';
-import PageHeader from '../../components/PageHeader';
-import StatusBadge from '../../components/StatusBadge';
-import ConfirmButton from '../../components/ConfirmButton';
-import { getProducts,getReport,submitDaily,updateDaily,getDailySubmissionStatus } from '../../services/api';
-import { unitLabel } from '../../lib/format';
-import { formatNumber } from '../../lib/periods';
-
-export default function Daily(){
-  const {project,profile}=useApp();
-  const [date,setDate]=useState(new Date().toISOString().slice(0,10));
-  const [products,setProducts]=useState([]);
-  const [report,setReport]=useState(null);
-  const [values,setValues]=useState({});
-  const [error,setError]=useState('');
-  const manager=['admin','super_admin'].includes(profile?.role);
-  const isFriday=new Date(`${date}T12:00:00`).getDay()===5;
-
-  async function load(){
-    if(!project) return;
-    const p=await getProducts(project);setProducts(p);
-    if(project.id==='demo-project'){setReport(null);setValues(Object.fromEntries(p.map(x=>[x.id,0])));return;}
-    if(manager){
-      const r=await getReport(project,date);setReport(r);
-      setValues(Object.fromEntries((r?.daily_usage||[]).map(x=>[x.product_id,x.quantity])));
-    } else {
-      const status = await getDailySubmissionStatus(project, date);
-      setReport(
-        status.day_submitted
-          ? {
-              submitted_at: status.my_submitted_at,
-              submitted_by_me: status.submitted_by_me
-            }
-          : null
-      );
-      setValues(Object.fromEntries(p.map(x => [x.id, 0])));
-    }
-  }
-  useEffect(()=>{load().catch(e=>setError(e.message))},[project?.id,date]);
-
-  async function submit(){
-    setError('');
-    const rows=products.map(p=>({product_id:p.id,quantity:Number(values[p.id]||0)}));
-    const r=await submitDaily(project,date,profile.id,rows);
-    setReport(r); await load();
-  }
-
-  async function saveEdit(){
-    const rows=products.map(p=>({product_id:p.id,quantity:Number(values[p.id]||0)}));
-    await updateDaily(project,report.id,profile.id,rows);
-    await load();
-  }
-
-  const submitted=Boolean(report);
-  return <div className="page">
-    <PageHeader eyebrow="USAGE / DAILY" title="Daily Consumption Checklist" description="One report for the whole product list. Zero is a valid entry." actions={
-      <div className="date-control"><label>Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></div>
-    }/>
-    {isFriday && <div className="notice warning"><Lock size={17}/><div><strong>Friday is an off day.</strong><span>No consumption report is accepted or displayed for Friday.</span></div></div>}
-    {!isFriday && <section className="card">
-      <div className="report-toolbar"><div><span className="eyebrow">REPORT DATE</span><h2>{new Date(`${date}T12:00:00`).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</h2></div>{submitted?<StatusBadge status="submitted">Submitted</StatusBadge>:<StatusBadge status="pending">Not submitted</StatusBadge>}</div>
-      {submitted && !manager ? <div className="locked-report"><CheckCircle2 size={24}/><h3>Report already submitted</h3><p>This reporting day is locked. Staff cannot view or edit submitted quantities.</p><small>{report.submitted_by_me ? 'You submitted this report.' : 'Another staff member has already submitted this day.'}</small></div> :
-      <form onSubmit={e=>{e.preventDefault();if(!submitted)submit().catch(e=>setError(e.message))}}>
-        <div className="table-wrap">
-          <table className="data-table consumption-table"><thead><tr><th>Housekeeping Supplies</th><th>Unit</th><th>Today's Usage</th></tr></thead>
-          <tbody>{products.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{unitLabel(p.unit)}</td><td><input className="qty-input" type="number" min="0" step="0.001" value={values[p.id]??0} onChange={e=>setValues(v=>({...v,[p.id]:e.target.value}))} /></td></tr>)}</tbody></table>
-        </div>
-        {error&&<div className="form-error">{error}</div>}
-        {!manager && !submitted && <button className="btn btn-primary btn-lg submit-btn" type="submit"><Send size={17}/> Submit Report</button>}
-        {manager && submitted && <ConfirmButton label="Confirm & Save" title="Confirm Daily Report Changes" message="This will replace the submitted quantities for this day and create an audit record." onConfirm={()=>saveEdit()} />}
-      </form>}
-    </section>}
-  </div>
-}
+import React,{useEffect,useState}from'react';
+import{CheckCircle2,ClipboardPenLine,Lock,Send}from'lucide-react';
+import{useApp}from'../../AppContext';import PageHeader from'../../components/PageHeader';import StatusBadge from'../../components/StatusBadge';import ConfirmButton from'../../components/ConfirmButton';import Modal from'../../components/Modal';
+import{getProducts,getReport,submitDaily,updateDaily,getDailySubmissionStatus,getMyDailyReport,requestDailyCorrection,getDailyCorrectionRequests,resolveDailyCorrection}from'../../services/api';import{unitLabel}from'../../lib/format';import{formatNumber}from'../../lib/periods';
+export default function Daily(){const{project,profile}=useApp();const[date,setDate]=useState(new Date().toISOString().slice(0,10)),[products,setProducts]=useState([]),[report,setReport]=useState(null),[values,setValues]=useState({}),[draft,setDraft]=useState({}),[requests,setRequests]=useState([]),[open,setOpen]=useState(false),[note,setNote]=useState(''),[sent,setSent]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');const manager=['admin','super_admin'].includes(profile?.role),friday=new Date(`${date}T12:00:00`).getDay()===5;
+async function load(){if(!project)return;const p=await getProducts(project);setProducts(p);setSent(false);if(manager){const r=await getReport(project,date);setReport(r);setValues(Object.fromEntries((r?.daily_usage||[]).map(x=>[x.product_id,x.quantity])));setRequests(r?await getDailyCorrectionRequests(project,r.id):[])}else{const s=await getDailySubmissionStatus(project,date),r=s.submitted_by_me?await getMyDailyReport(project,date):null;setReport(r||(s.day_submitted?{submitted_by_me:false}:null));setValues(Object.fromEntries((r?.daily_usage||p).map(x=>[x.product_id||x.id,x.quantity||0])))}}
+useEffect(()=>{setLoading(true);load().catch(e=>setError(e.message)).finally(()=>setLoading(false))},[project?.id,date]);const rows=()=>products.map(p=>({product_id:p.id,quantity:Number(values[p.id]||0)})),draftRows=()=>products.map(p=>({product_id:p.id,quantity:Number(draft[p.id]??values[p.id]??0)}));async function submit(){await submitDaily(project,date,profile.id,rows());await load()}async function save(){await updateDaily(project,report.id,profile.id,rows());await load()}async function request(){if(!note.trim())throw new Error('Please explain why you need this correction.');await requestDailyCorrection(project,report.id,draftRows(),note,profile.id);setOpen(false);setNote('');setSent(true)}async function decide(id,decision){await resolveDailyCorrection(project,id,decision,profile.id);await load()}const submitted=Boolean(report),own=submitted&&!manager&&report.submitted_by_me;const requested=(r,id,old)=>Number((r.requested_usage||[]).find(x=>x.product_id===id)?.quantity??old);if(loading)return <div className="page"><PageHeader eyebrow="USAGE / DAILY" title="Daily Consumption Checklist" description="Checking today’s submission status…"/><section className="card"><div className="loading-row">Loading today’s report…</div></section></div>;
+const QuantityTable=({editable=false,r})=><div className="table-wrap"><table className="data-table correction-table"><thead><tr><th>Item</th><th>Unit</th><th>Submitted quantity</th>{editable?<th>Corrected quantity</th>:r&&<th>Requested quantity</th>}</tr></thead><tbody>{products.map(p=>{const old=Number(values[p.id]||0),next=r?requested(r,p.id,old):Number(draft[p.id]??old),changed=old!==next;return <tr key={p.id}><td><strong>{p.name}</strong></td><td>{unitLabel(p.unit)}</td><td className={changed?'correction-old':''}>{changed?<del>{formatNumber(old)}</del>:formatNumber(old)}</td>{editable?<td><input className="qty-input" type="number" min="0" step="0.001" value={draft[p.id]??old} onChange={e=>setDraft(v=>({...v,[p.id]:e.target.value}))}/></td>:r&&<td className={changed?'correction-new':''}>{changed?<strong>{formatNumber(next)}</strong>:formatNumber(next)}</td>}</tr>})}</tbody></table></div>;
+return <div className="page"><PageHeader eyebrow="USAGE / DAILY" title="Daily Consumption Checklist" description="One report for the whole product list. Zero is a valid entry." actions={<div className="date-control"><label>Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></div>}/>{friday&&<div className="notice warning"><Lock size={17}/><div><strong>Friday is an off day.</strong><span>No consumption report is accepted or displayed for Friday.</span></div></div>}{!friday&&<section className="card"><div className="report-toolbar"><div><span className="eyebrow">REPORT DATE</span><h2>{new Date(`${date}T12:00:00`).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</h2></div>{submitted?<StatusBadge status="submitted">Submitted</StatusBadge>:<StatusBadge status="pending">Not submitted</StatusBadge>}</div>{submitted&&!manager?<div className="submitted-preview"><div className="locked-report"><CheckCircle2 size={24}/><h3>Report already submitted</h3><p>{own?'Here is the read-only copy of the quantities you submitted.':'Another staff member submitted this reporting day.'}</p></div>{own&&<><QuantityTable/><div className="correction-bar"><div><strong>Spot a mistake?</strong><span>Edit the full table and give a reason for management to review.</span></div><button className="btn btn-secondary" onClick={()=>{setDraft(values);setOpen(true)}}><ClipboardPenLine size={16}/>Request correction</button></div>{sent&&<div className="notice success-notice">Your correction request was sent to management.</div>}</>}</div>:<form onSubmit={e=>{e.preventDefault();if(!submitted)submit().catch(x=>setError(x.message))}}><div className="table-wrap"><table className="data-table consumption-table"><thead><tr><th>Housekeeping Supplies</th><th>Unit</th><th>Today's Usage</th></tr></thead><tbody>{products.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{unitLabel(p.unit)}</td><td><input className="qty-input" type="number" min="0" step="0.001" value={values[p.id]??0} onChange={e=>setValues(v=>({...v,[p.id]:e.target.value}))}/></td></tr>)}</tbody></table></div>{!manager&&!submitted&&<button className="btn btn-primary btn-lg submit-btn" type="submit"><Send size={17}/>Submit Report</button>}{manager&&submitted&&<ConfirmButton label="Confirm & Save" title="Confirm Daily Report Changes" message="This will replace the submitted quantities for this day and create an audit record." onConfirm={save}/>}</form>}{error&&<div className="form-error">{error}</div>}</section>}{manager&&requests.length>0&&<section className="card correction-requests"><div className="card-head"><div><h2>Correction requests</h2><p>Approve to automatically apply the edited quantities.</p></div></div>{requests.map(r=><div className="correction-request" key={r.id}><div><strong>{r.profiles?.full_name||'Staff member'}</strong><span>Requested {new Date(r.created_at).toLocaleString()}</span>{r.notes&&<p>{r.notes}</p>}{r.status==='pending'&&<QuantityTable r={r}/>}</div><StatusBadge status={r.status==='pending'?'pending':r.status==='approved'?'submitted':'normal'}>{r.status}</StatusBadge>{r.status==='pending'&&<div className="button-row"><ConfirmButton label="Approve & apply" title="Approve correction request" message="This automatically replaces submitted quantities with the edited values." onConfirm={()=>decide(r.id,'approved')}/><ConfirmButton label="Decline" className="btn btn-secondary" title="Decline correction request" message="The submitted quantities will remain unchanged." onConfirm={()=>decide(r.id,'rejected')}/></div>}</div>)}</section>}<Modal open={open} title="Request a stock correction" onClose={()=>setOpen(false)} footer={<><button className="btn btn-secondary" onClick={()=>setOpen(false)}>Cancel</button><ConfirmButton label="Send for review" title="Send correction request" message="Your edited quantities and reason will be sent to management for approval." onConfirm={request}/></>}><div className="form-stack"><p className="muted">The full table is included in the request.</p><QuantityTable editable/><label>Reason for correction<textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Example: I entered 10 cases for bleach; it should be 1." required/></label></div></Modal></div>}

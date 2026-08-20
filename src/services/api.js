@@ -630,3 +630,69 @@ export async function getMySubmissionStatus(project, date) {
     day_submitted: Boolean(status.day_submitted)
   };
 }
+
+export async function getMyDailyReport(project, date) {
+  requireProject(project);
+  const { data, error } = await supabase.rpc('my_daily_report', {
+    p_project_id: project.id,
+    p_report_date: date
+  });
+  if (error) throw error;
+  return data || null;
+}
+
+export async function requestDailyCorrection(project, reportId, usageRows, notes, userId) {
+  requireProject(project);
+  const { data, error } = await supabase.rpc('request_daily_correction', {
+    p_project_id: project.id,
+    p_report_id: reportId,
+    p_requested_usage: cleanRows(usageRows),
+    p_notes: notes?.trim() || null,
+    p_requester_id: userId
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function getDailyCorrectionRequests(project, reportId) {
+  requireProject(project);
+  const { data, error } = await supabase
+    .from('daily_correction_requests')
+    .select('*, profiles:requested_by(full_name,username)')
+    .eq('project_id', project.id)
+    .eq('report_id', reportId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function resolveDailyCorrection(project, requestId, decision, editorId) {
+  requireProject(project);
+  const { error } = await supabase.rpc('resolve_daily_correction', {
+    p_request_id: requestId,
+    p_decision: decision,
+    p_editor_id: editorId
+  });
+  if (error) throw error;
+}
+
+export async function getStaffCorrectionPermission(project, reportId) {
+  requireProject(project);
+  const { data, error } = await supabase.rpc('staff_correction_permission', {
+    p_project_id: project.id,
+    p_report_id: reportId
+  }).maybeSingle();
+  if (error) throw error;
+  return Boolean(data?.allowed);
+}
+
+export async function submitStaffCorrection(project, reportId, usageRows, userId) {
+  requireProject(project);
+  const { error } = await supabase.rpc('staff_replace_daily_report', {
+    p_project_id: project.id,
+    p_report_id: reportId,
+    p_usage: cleanRows(usageRows),
+    p_staff_id: userId
+  });
+  if (error) throw error;
+}

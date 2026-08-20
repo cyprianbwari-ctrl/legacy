@@ -116,6 +116,25 @@ create table if not exists public.stock_adjustments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.daily_correction_requests (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  report_id uuid not null references public.daily_reports(id) on delete cascade,
+  requested_by uuid not null references public.profiles(id) on delete restrict,
+  requested_usage jsonb not null,
+  notes text,
+  status text not null default 'pending' check(status in ('pending','approved','rejected')),
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.daily_correction_requests
+  drop constraint if exists daily_correction_requests_status_check;
+alter table public.daily_correction_requests
+  add constraint daily_correction_requests_status_check
+  check(status in ('pending','approved','rejected','completed'));
+
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references public.projects(id) on delete cascade,
@@ -156,6 +175,7 @@ create index if not exists idx_memberships_project_active on public.project_memb
 create index if not exists idx_products_project on public.products(project_id);
 create index if not exists idx_reports_project_date on public.daily_reports(project_id,report_date);
 create index if not exists idx_usage_report on public.daily_usage(report_id);
+create index if not exists idx_correction_requests_report on public.daily_correction_requests(report_id,created_at desc);
 create index if not exists idx_audit_project_time on public.audit_logs(project_id,created_at desc);
 
 create or replace function public.touch_updated_at()
@@ -819,6 +839,71 @@ $$;
 revoke all on function public.admin_save_month(uuid,date,uuid,jsonb,jsonb) from public;
 grant execute on function public.admin_save_month(uuid,date,uuid,jsonb,jsonb) to authenticated;
 
+create or replace function public.my_daily_report(p_project_id uuid,p_report_date date)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare result jsonb;
+begin
+  select jsonb_build_object('id',r.id,'submitted_at',r.submitted_at,'submitted_by_me',true,'daily_usage',coalesce(jsonb_agg(jsonb_build_object('product_id',u.product_id,'quantity',u.quantity)) filter(where u.id is not null),'[]'::jsonb)) into result from daily_reports r left join daily_usage u on u.report_id=r.id where r.project_id=p_project_id and r.report_date=p_report_date and r.submitted_by=auth.uid() group by r.id;
+  return result;
+end; $$;
+revoke all on function public.my_daily_report(uuid,date) from public;
+grant execute on function public.my_daily_report(uuid,date) to authenticated;
+
+create or replace function public.request_daily_correction(p_project_id uuid,p_report_id uuid,p_requested_usage jsonb,p_notes text,p_requester_id uuid)
+returns uuid language plpgsql security definer set search_path=public as $$
+declare request_id uuid;
+begin
+  if auth.uid() is null or auth.uid()<>p_requester_id then raise exception 'You may only request a correction for yourself'; end if;
+  if not exists(select 1 from daily_reports where id=p_report_id and project_id=p_project_id and submitted_by=auth.uid()) then raise exception 'You may only request a correction for your own report'; end if;
+  insert into daily_correction_requests(project_id,report_id,requested_by,requested_usage,notes) values(p_project_id,p_report_id,auth.uid(),p_requested_usage,p_notes) returning id into request_id;
+  insert into audit_logs(project_id,actor_id,action,entity_type,entity_id,details) values(p_project_id,auth.uid(),'daily_report.correction_requested','daily_correction_request',request_id,jsonb_build_object('reportId',p_report_id,'notes',p_notes));
+  return request_id;
+end; $$;
+revoke all on function public.request_daily_correction(uuid,uuid,jsonb,text,uuid) from public;
+grant execute on function public.request_daily_correction(uuid,uuid,jsonb,text,uuid) to authenticated;
+
+create or replace function public.resolve_daily_correction(p_request_id uuid,p_decision text,p_editor_id uuid)
+returns void language plpgsql security definer set search_path=public as $$
+declare req daily_correction_requests%rowtype;
+begin
+  if auth.uid() is null or auth.uid()<>p_editor_id then raise exception 'Invalid editor'; end if;
+  select * into req from daily_correction_requests where id=p_request_id for update;
+  if req.id is null or not is_manager(req.project_id) then raise exception 'Not authorized to review this request'; end if;
+  if req.status<>'pending' or p_decision not in ('approved','rejected') then raise exception 'This request cannot be processed'; end if;
+  if p_decision='approved' then
+    delete from daily_usage where report_id=req.report_id;
+    insert into daily_usage(report_id,product_id,quantity)
+    select req.report_id,(item->>'product_id')::uuid,greatest(0,(item->>'quantity')::numeric)
+    from jsonb_array_elements(req.requested_usage) item;
+    update daily_reports set updated_at=now() where id=req.report_id;
+  end if;
+  update daily_correction_requests set status=p_decision,reviewed_by=auth.uid(),reviewed_at=now() where id=req.id;
+  insert into audit_logs(project_id,actor_id,action,entity_type,entity_id,details) values(req.project_id,auth.uid(),case when p_decision='approved' then 'daily_report.correction_approved' else 'daily_report.correction_rejected' end,'daily_correction_request',req.id,jsonb_build_object('reportId',req.report_id));
+end; $$;
+revoke all on function public.resolve_daily_correction(uuid,text,uuid) from public;
+grant execute on function public.resolve_daily_correction(uuid,text,uuid) to authenticated;
+
+create or replace function public.staff_correction_permission(p_project_id uuid,p_report_id uuid)
+returns table(allowed boolean) language sql stable security definer set search_path=public as $$
+  select exists(select 1 from daily_correction_requests where project_id=p_project_id and report_id=p_report_id and requested_by=auth.uid() and status='approved');
+$$;
+revoke all on function public.staff_correction_permission(uuid,uuid) from public;
+grant execute on function public.staff_correction_permission(uuid,uuid) to authenticated;
+
+create or replace function public.staff_replace_daily_report(p_project_id uuid,p_report_id uuid,p_usage jsonb,p_staff_id uuid)
+returns void language plpgsql security definer set search_path=public as $$
+begin
+  if auth.uid() is null or auth.uid()<>p_staff_id then raise exception 'Invalid staff member'; end if;
+  if not exists(select 1 from daily_correction_requests where project_id=p_project_id and report_id=p_report_id and requested_by=auth.uid() and status='approved') then raise exception 'This correction has not been approved'; end if;
+  delete from daily_usage where report_id=p_report_id;
+  insert into daily_usage(report_id,product_id,quantity) select p_report_id,(item->>'product_id')::uuid,greatest(0,(item->>'quantity')::numeric) from jsonb_array_elements(p_usage) item;
+  update daily_correction_requests set status='completed', reviewed_at=now() where project_id=p_project_id and report_id=p_report_id and requested_by=auth.uid() and status='approved';
+  update daily_reports set updated_at=now() where id=p_report_id and project_id=p_project_id;
+  insert into audit_logs(project_id,actor_id,action,entity_type,entity_id,details) values(p_project_id,auth.uid(),'daily_report.corrected_by_staff','daily_report',p_report_id,jsonb_build_object('usage',p_usage));
+end; $$;
+revoke all on function public.staff_replace_daily_report(uuid,uuid,jsonb,uuid) from public;
+grant execute on function public.staff_replace_daily_report(uuid,uuid,jsonb,uuid) to authenticated;
+
 -- RLS
 alter table public.companies enable row level security;
 alter table public.projects enable row level security;
@@ -828,6 +913,7 @@ alter table public.products enable row level security;
 alter table public.staff_assignments enable row level security;
 alter table public.daily_reports enable row level security;
 alter table public.daily_usage enable row level security;
+alter table public.daily_correction_requests enable row level security;
 alter table public.stock_adjustments enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.period_initials enable row level security;
@@ -939,6 +1025,10 @@ drop policy if exists adjustments_manager_all on public.stock_adjustments;
 create policy adjustments_manager_all on public.stock_adjustments for all
 using(public.is_manager(project_id))
 with check(public.is_manager(project_id) and created_by=auth.uid());
+
+drop policy if exists correction_requests_manager_read on public.daily_correction_requests;
+create policy correction_requests_manager_read on public.daily_correction_requests for select
+using(public.is_manager(project_id));
 
 drop policy if exists audit_manager_read on public.audit_logs;
 create policy audit_manager_read on public.audit_logs for select

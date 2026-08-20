@@ -9,13 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/server": "^1.4.1",
     "@supabase/supabase-js": "^2.53.0",
-    "lucide-react": "^0.468.0",
     "jspdf": "^3.0.2",
-    "xlsx": "^0.18.5",
+    "lucide-react": "^0.468.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.8.1"
+    "react-router-dom": "^7.8.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "vite": "^7.1.2"
