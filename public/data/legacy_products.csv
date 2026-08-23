@@ -1,0 +1,13 @@
+name,unit,full_stock,order_point,low_stock_point,active,packaging,notes
+"Toilet Rolls (10 rolls / pack)",roll,148,40,20,true,"{""case"":120,""pack"":10,""base"":""roll""}","Legacy initial: 12 case + 4 rolls = 148 rolls."
+"Ecofresh facial tissue box, 150 sheets, 1x30 pkt",packet,1139,360,180,true,"{""case"":30,""base"":""packet""}","Legacy initial: 37 case + 29 packets = 1139 packets."
+"Maxi Roll Magic 450 sheets (1x6)",roll,30,10,5,true,{},"Legacy initial: 30 rolls."
+"Autocut Hand Towel Roll - 2Ply 230 Mtr",roll,42,12,6,true,{},"Legacy initial: 42 rolls."
+"Folded Tissue 200x15 3000 sheets 2ply",piece,48,15,8,true,{},"Legacy initial: 48 pcs."
+"Clorox wipes",piece,51,15,8,true,{},"Legacy initial: 51 pcs."
+"GLADE Air Freshener (300ml) Rose (WASHROOM)",piece,8,3,1,true,{},"Legacy initial: 8 pcs."
+"GLADE Air Freshener (300ml) Lavender (RECEPTION)",piece,10,3,1,true,{},"Legacy initial: 10 pcs."
+"Sanitary pads",pad,15,6,3,true,{},"Legacy initial handwriting appears as 1 pack + 15 pads; verify pack conversion."
+"Kimbo Beans Aroma Bio Organic 1KG",kg,18,6,3,true,{},"Legacy sheet shows 18 pcs; unit is KG on product label. Verify."
+"RAINBOW Milk Organic Full Fat 1 LTR",litre,98,30,15,true,{},"Legacy initial: 98 pcs."
+"Organic Brown Sugar SIS 500G",piece,3,2,1,true,{},"Handwritten quantity contains an extra mark; verify before final save."
